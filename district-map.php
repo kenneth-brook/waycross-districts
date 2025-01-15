@@ -30,6 +30,7 @@
                     <div class="content-header-left cushycms" title="Page header"><h2 class="main-title large mt-xl-2 mb-6">District Map</h2>
                 </div>
             </div>
+            < ----- MAP GOES HERE ----- >
         </div>
     </main>
     <?php include "includes/footer.php"; ?>
