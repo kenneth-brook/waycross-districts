@@ -5503,7 +5503,6 @@
                         ]
                     }
                 }
-                // Add the rest of your districts here
             ]
         };
 
@@ -5554,6 +5553,51 @@
             });
 
             map.addLayer({
+                id: 'districts-hover',
+                type: 'fill',
+                source: 'districts',
+                paint: {
+                    'fill-color': '#FFD700', // Gold color for the highlight
+                    'fill-opacity': 0.8
+                },
+                filter: ['==', 'district', ''] // Initially, no polygon is highlighted
+            });
+
+            // Add a border highlight for hover effect
+            map.addLayer({
+                id: 'districts-hover-outline',
+                type: 'line',
+                source: 'districts',
+                paint: {
+                    'line-color': '#FFD700', // Gold color for the outline
+                    'line-width': 4,
+                    'line-opacity': 1
+                },
+                filter: ['==', 'district', ''] // Initially, no polygon is highlighted
+            });
+
+            // Handle mouseenter and mouseleave events
+            map.on('mousemove', 'districts-layer', (e) => {
+                const districtName = e.features[0].properties.district;
+
+                // Update the hover layer filter to show the hovered polygon
+                map.setFilter('districts-hover', ['==', 'district', districtName]);
+                map.setFilter('districts-hover-outline', ['==', 'district', districtName]);
+
+                // Change cursor to pointer
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.on('mouseleave', 'districts-layer', () => {
+                // Reset hover layers to not show any polygon
+                map.setFilter('districts-hover', ['==', 'district', '']);
+                map.setFilter('districts-hover-outline', ['==', 'district', '']);
+
+                // Reset cursor
+                map.getCanvas().style.cursor = '';
+            });
+
+            map.addLayer({
                 id: 'district-labels',
                 type: 'symbol',
                 source: 'districts',
@@ -5571,7 +5615,13 @@
             });
 
             // Dynamically fetch and merge properties
-            const propertyFiles = ['popup-data/district1.json', 'popup-data/district2.json', 'popup-data/district3.json', 'popup-data/district4.json', 'popup-data/district5.json'];
+            const propertyFiles = [
+                './popup-data/district1.json',
+                './popup-data/district2.json',
+                './popup-data/district3.json',
+                './popup-data/district4.json',
+                './popup-data/district5.json'
+            ];
             const propertyPromises = propertyFiles.map(file => fetch(file).then(res => res.json()));
 
             Promise.all(propertyPromises).then(propertiesList => {
@@ -5585,30 +5635,33 @@
                     const districtProps = propertiesMap[districtName];
 
                     if (districtProps) {
+                        const pictureHtml = districtProps.Picture
+                            ? `<img src="${districtProps.Picture}" alt="${districtProps.representative}" style="width: 150px; height: auto; border-radius: 8px; margin-top: 8px;">`
+                            : `<p style="font-style: italic; color: gray;">No picture available</p>`;
+
+                        const phoneHtml = districtProps.phone
+                            ? `<p>Phone: ${districtProps.phone}</p>`
+                            : '';
+
+                        const emailHtml = districtProps.email
+                            ? `<p>Email: <a href="mailto:${districtProps.email}" style="color: blue;">${districtProps.email}</a></p>`
+                            : '';
+
                         const popupContent = `
-              <strong>${districtProps.district}</strong><br>
-              Population: ${districtProps.population}<br>
-              Representative: ${districtProps.representative || 'N/A'}
-            `;
+                            <div style="text-align: center;">
+                                <strong>${districtName}</strong><br>
+                                <p>Population: ${districtProps.population}</p>
+                                ${pictureHtml}
+                                <p>Commissioner: ${districtProps.representative}</p>
+                                ${phoneHtml}
+                                ${emailHtml}
+                            </div>
+                        `;
                         new mapboxgl.Popup()
                             .setLngLat(e.lngLat)
                             .setHTML(popupContent)
                             .addTo(map);
                     }
-                });
-
-                // Add district labels
-                map.addLayer({
-                    id: 'district-labels',
-                    type: 'symbol',
-                    source: 'districts',
-                    layout: {
-                        'text-field': ['get', 'district'],
-                        'text-size': 14,
-                        'text-offset': [0, 0.5],
-                        'text-anchor': 'top'
-                    },
-                    paint: { 'text-color': '#000', 'text-halo-color': '#FFF', 'text-halo-width': 1 }
                 });
             });
 
