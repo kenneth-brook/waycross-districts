@@ -109,70 +109,168 @@
         });
     });
 
-    
-
-document.addEventListener('DOMContentLoaded', () => {
-    mapboxgl.accessToken = 'pk.eyJ1IjoiMzY1YWRtaW4iLCJhIjoiY201d3diMXVyMDJteTJxb2xyd2xsdTl3aSJ9._bG3aqw05sfgNZFXKWMxrA';
-
-    // Set default visibility for layers
-    const isCityView = true; // Set this to `true` for the city website and `false` for the county website
-
-    // Default visibility states
+    const isCityView = true; // Set to `true` for city website, `false` for county website
     const defaultCityVisibility = isCityView ? 'visible' : 'none';
     const defaultCountyVisibility = isCityView ? 'none' : 'visible';
 
-    const map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/streets-v11',
-        center: [-82.375, 31.205], // Adjust for your area
-        zoom: 12.7
-    });
+    document.addEventListener('DOMContentLoaded', () => {
+        mapboxgl.accessToken = 'pk.eyJ1IjoiMzY1YWRtaW4iLCJhIjoiY201d3diMXVyMDJteTJxb2xyd2xsdTl3aSJ9._bG3aqw05sfgNZFXKWMxrA';
 
-    // Define your GeoJSON files
-    const coordFiles = [
-        './coord-data/district1.geojson',
-        './coord-data/district2.geojson',
-        './coord-data/district3.geojson',
-        './coord-data/district4.geojson',
-        './coord-data/district5.geojson'
-    ];
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/streets-v11',
+            center: [-82.375, 31.205], // Default center
+            zoom: 12.5 // Default zoom
+        });
 
-    const countyCoordFiles = [
-        './coord-data/county/county1.geojson',
-        './coord-data/county/county2.geojson',
-        './coord-data/county/county3.geojson',
-        './coord-data/county/county4.geojson'
-    ];
+        const cityCoordFiles = [
+            './coord-data/district1.geojson',
+            './coord-data/district2.geojson',
+            './coord-data/district3.geojson',
+            './coord-data/district4.geojson',
+            './coord-data/district5.geojson'
+        ];
 
-    const countyPropertyFiles = [
-        './popup-data/county/county1.json',
-        './popup-data/county/county2.json',
-        './popup-data/county/county3.json',
-        './popup-data/county/county4.json'
-    ];
+        const countyCoordFiles = [
+            './coord-data/county/county1.geojson',
+            './coord-data/county/county2.geojson',
+            './coord-data/county/county3.geojson',
+            './coord-data/county/county4.geojson'
+        ];
 
-    // Load GeoJSON data and add to map
-    Promise.all(coordFiles.map(file => fetch(file).then(res => res.json())))
-        .then(geojsonList => {
-            // Combine all districts into one GeoJSON source
-            const combinedGeoJSON = {
+        const cityPropertyFiles = [
+            './popup-data/district1.json',
+            './popup-data/district2.json',
+            './popup-data/district3.json',
+            './popup-data/district4.json',
+            './popup-data/district5.json'
+        ];
+
+        const countyPropertyFiles = [
+            './popup-data/county/county1.json',
+            './popup-data/county/county2.json',
+            './popup-data/county/county3.json',
+            './popup-data/county/county4.json'
+        ];
+
+        const cityViewSettings = { center: [-82.375, 31.205], zoom: 12.5 };
+        const countyViewSettings = { center: [-82.400, 31.050], zoom: 9 };
+
+        const addDistrictLayers = async (geoJSONFiles, propertyFiles, sourceId, layerIdPrefix, paintStyles, defaultVisibility) => {
+            const geoJSONData = {
                 type: 'FeatureCollection',
-                features: geojsonList.flatMap(data => data.features)
+                features: (await Promise.all(geoJSONFiles.map(file => fetch(file).then(res => res.json())))).flatMap(data => data.features)
             };
 
-            map.on('load', () => {
-                // Add the districts source
-                map.addSource('districts', {
-                    type: 'geojson',
-                    data: combinedGeoJSON
-                });
+            const propertiesList = await Promise.all(propertyFiles.map(file => fetch(file).then(res => res.json())));
+            const propertiesMap = Object.fromEntries(propertiesList.map(props => [props.district, props]));
 
-                // Add districts fill layer
-                map.addLayer({
-                    id: 'districts-layer',
-                    type: 'fill',
-                    source: 'districts',
-                    paint: {
+            map.addSource(sourceId, { type: 'geojson', data: geoJSONData });
+
+            map.addLayer({
+                id: `${layerIdPrefix}-layer`,
+                type: 'fill',
+                source: sourceId,
+                paint: paintStyles.fill,
+                layout: { visibility: defaultVisibility }
+            });
+
+            map.addLayer({
+                id: `${layerIdPrefix}-outline`,
+                type: 'line',
+                source: sourceId,
+                paint: paintStyles.outline,
+                layout: { visibility: defaultVisibility }
+            });
+
+            map.addLayer({
+                id: `${layerIdPrefix}-labels`,
+                type: 'symbol',
+                source: sourceId,
+                layout: {
+                    'text-field': ['get', 'district'],
+                    'text-size': 16,
+                    'text-offset': [0, 0.5],
+                    'text-anchor': 'top',
+                    'visibility': defaultVisibility
+                },
+                paint: {
+                    'text-color': '#000',
+                    'text-halo-color': '#FFF',
+                    'text-halo-width': 1
+                }
+            });
+
+            map.addLayer({
+                id: `${layerIdPrefix}-hover`,
+                type: 'fill',
+                source: sourceId,
+                paint: {
+                    'fill-color': '#FFD700', // Highlight color
+                    'fill-opacity': 0.8
+                },
+                filter: ['==', 'district', ''] // No district highlighted initially
+            });
+
+            // Hover effects
+            map.on('mousemove', `${layerIdPrefix}-layer`, (e) => {
+                const districtName = e.features[0].properties.district;
+                map.setFilter(`${layerIdPrefix}-hover`, ['==', 'district', districtName]);
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.on('mouseleave', `${layerIdPrefix}-layer`, () => {
+                map.setFilter(`${layerIdPrefix}-hover`, ['==', 'district', '']);
+                map.getCanvas().style.cursor = '';
+            });
+
+            // Popups
+            map.on('click', `${layerIdPrefix}-layer`, (e) => {
+                const districtName = e.features[0].properties.district;
+                const districtProps = propertiesMap[districtName];
+
+                if (districtProps) {
+                    const pictureHtml = districtProps.Picture
+                        ? `<img src="${districtProps.Picture}" alt="${districtProps.representative}" style="width: 150px; height: auto; border-radius: 8px; margin-top: 8px;">`
+                        : `<p style="font-style: italic; color: gray;">No picture available</p>`;
+
+                    const phoneHtml = districtProps.phone
+                        ? `<p>Phone: ${districtProps.phone}</p>`
+                        : '';
+
+                    const emailHtml = districtProps.email
+                        ? `<p>Email: <a href="mailto:${districtProps.email}" style="color: blue;">${districtProps.email}</a></p>`
+                        : '';
+
+                    const popupContent = `
+                        <div style="text-align: center;">
+                            <strong>${districtProps.tag}</strong><br>
+                            <p>Population: ${districtProps.population}</p>
+                            ${pictureHtml}
+                            <p>Commissioner: ${districtProps.representative}</p>
+                            ${phoneHtml}
+                            ${emailHtml}
+                        </div>
+                    `;
+                    new mapboxgl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(popupContent)
+                        .addTo(map);
+                } else {
+                    console.warn(`No properties found for district: ${districtName}`);
+                }
+            });
+            return geoJSONData;
+        };
+
+        map.on('load', async () => {
+            const cityGeoJSONData = await addDistrictLayers(
+                cityCoordFiles,
+                cityPropertyFiles,
+                'city-districts',
+                'city-districts',
+                {
+                    fill: {
                         'fill-color': [
                             'match',
                             ['get', 'district'],
@@ -181,303 +279,76 @@ document.addEventListener('DOMContentLoaded', () => {
                             'District 3', '#005CE6',
                             'District 4', '#FF0000',
                             'District 5', '#FFCA00',
-                            '#FFFFFF' // Default color
+                            '#FFFFFF'
                         ],
                         'fill-opacity': 0.5
-                    }
-                });
-
-                map.addLayer({
-                    id: 'districts-outline',
-                    type: 'line',
-                    source: 'districts', // Use the same source as the fill layer
-                    paint: {
-                        'line-color': '#333', // Outline color
-                        'line-width': 1 // Outline thickness
-                    }
-                });
-
-                // Add district labels
-                map.addLayer({
-                    id: 'district-labels',
-                    type: 'symbol',
-                    source: 'districts',
-                    layout: {
-                        'text-field': ['get', 'district'],
-                        'text-size': 16,
-                        'text-offset': [0, 0.5],
-                        'text-anchor': 'top'
                     },
-                    paint: {
-                        'text-color': '#000',
-                        'text-halo-color': '#FFF',
-                        'text-halo-width': 1
-                    }
-                });
+                    outline: { 'line-color': '#333', 'line-width': 1 }
+                },
+                defaultCityVisibility
+            );
 
-                // Hover effect layer
-                map.addLayer({
-                    id: 'districts-hover',
-                    type: 'fill',
-                    source: 'districts',
-                    paint: {
-                        'fill-color': '#FFD700', // Highlight color
-                        'fill-opacity': 0.8
-                    },
-                    filter: ['==', 'district', ''] // No district highlighted initially
-                });
-
-                // Handle mouse hover
-                map.on('mousemove', 'districts-layer', (e) => {
-                    const districtName = e.features[0].properties.district;
-                    map.setFilter('districts-hover', ['==', 'district', districtName]);
-                    map.getCanvas().style.cursor = 'pointer';
-                });
-
-                map.on('mouseleave', 'districts-layer', () => {
-                    map.setFilter('districts-hover', ['==', 'district', '']);
-                    map.getCanvas().style.cursor = '';
-                });
-
-                // Handle popups with additional data
-                const propertyFiles = [
-                    './popup-data/district1.json',
-                    './popup-data/district2.json',
-                    './popup-data/district3.json',
-                    './popup-data/district4.json',
-                    './popup-data/district5.json'
-                ];
-
-                Promise.all(propertyFiles.map(file => fetch(file).then(res => res.json())))
-                    .then(propertiesList => {
-                        const propertiesMap = Object.fromEntries(
-                            propertiesList.map(props => [props.district, props])
-                        );
-
-                        map.on('click', 'districts-layer', (e) => {
-                            const districtName = e.features[0].properties.district;
-                            const districtProps = propertiesMap[districtName];
-
-                            if (districtProps) {
-                                const pictureHtml = districtProps.Picture
-                                    ? `<img src="${districtProps.Picture}" alt="${districtProps.representative}" style="width: 150px; height: auto; border-radius: 8px; margin-top: 8px;">`
-                                    : `<p style="font-style: italic; color: gray;">No picture available</p>`;
-
-                                const phoneHtml = districtProps.phone
-                                    ? `<p>Phone: ${districtProps.phone}</p>`
-                                    : '';
-
-                                const emailHtml = districtProps.email
-                                    ? `<p>Email: <a href="mailto:${districtProps.email}" style="color: blue;">${districtProps.email}</a></p>`
-                                    : '';
-
-                                const popupContent = `
-                                <div style="text-align: center;">
-                                    <strong>${districtName}</strong><br>
-                                    <p>Population: ${districtProps.population}</p>
-                                    ${pictureHtml}
-                                    <p>Commissioner: ${districtProps.representative}</p>
-                                    ${phoneHtml}
-                                    ${emailHtml}
-                                </div>
-                            `;
-                                new mapboxgl.Popup()
-                                    .setLngLat(e.lngLat)
-                                    .setHTML(popupContent)
-                                    .addTo(map);
-                            }
-                        });
-                    })
-                    .catch(error => console.error('Error loading popup data:', error));
-
-                const cityDistrictsLayer = map.getLayer('districts-layer');
-                if (cityDistrictsLayer) {
-                    document.getElementById('city-districts').addEventListener('change', (e) => {
-                        const visibility = e.target.checked ? 'visible' : 'none';
-                        console.log(`Setting city districts visibility to: ${visibility}`);
-
-                        map.setLayoutProperty('districts-layer', 'visibility', visibility);
-                        map.setLayoutProperty('districts-outline', 'visibility', visibility);
-                        map.setLayoutProperty('district-labels', 'visibility', visibility);
-                    });
-                } else {
-                    console.error('City districts layer not found.');
-                }
-            });
-        })
-        .catch(error => console.error('Error loading GeoJSON files:', error));
-
-
-
-        let combinedCountyGeoJSON;
-        let propertiesMap;
-
-        // Load GeoJSON and property files
-        const loadCountyData = async () => {
-            try {
-                const geojsonList = await Promise.all(
-                    countyCoordFiles.map(async (file) => {
-                        const res = await fetch(file);
-                        if (!res.ok) {
-                            throw new Error(`Failed to fetch ${file}: ${res.statusText}`);
-                        }
-                        const data = await res.json();
-                        console.log(`Fetched ${file} successfully:`, data);
-                        return data;
-                    })
-                );
-                combinedCountyGeoJSON = {
-                    type: 'FeatureCollection',
-                    features: geojsonList.flatMap(data => data.features)
-                };
-
-                console.log('County GeoJSON source added:', combinedCountyGeoJSON);
-
-                const propertiesList = await Promise.all(
-                    countyPropertyFiles.map(file => fetch(file).then(res => res.json()))
-                );
-                propertiesMap = Object.fromEntries(propertiesList.map(props => [props.district, props]));
-            } catch (error) {
-                console.error('Error loading county GeoJSON or property files:', error);
-            }
-        };
-
-        // Call loadCountyData before adding layers
-        (async () => {
-            await loadCountyData();
-
-            map.on('load', () => {
-                console.log('Adding county districts layer...');
-                console.log('County GeoJSON:', JSON.stringify(combinedCountyGeoJSON, null, 2));
-
-                map.addSource('county-districts', {
-                    type: 'geojson',
-                    data: combinedCountyGeoJSON
-                });
-
-                map.addLayer({
-                    id: 'county-districts-layer',
-                    type: 'fill',
-                    source: 'county-districts',
-                    paint: {
+            const countyGeoJSONData = await addDistrictLayers(
+                countyCoordFiles,
+                countyPropertyFiles,
+                'county-districts',
+                'county-districts',
+                {
+                    fill: {
                         'fill-color': [
                             'match',
                             ['get', 'district'],
-                            'County 1', '#FF5733', // Example color for County 1
-                            'County 2', '#33FF57', // Example color for County 2
-                            'County 3', '#3357FF', // Example color for County 3
-                            'County 4', '#FF33A1', // Example color for County 4
-                            '#FFFFFF' // Default color
+                            'County 1', '#FF5733',
+                            'County 2', '#33FF57',
+                            'County 3', '#3357FF',
+                            'County 4', '#FF33A1',
+                            '#FFFFFF'
                         ],
                         'fill-opacity': 0.5
-                    }
-                });
-
-                map.addLayer({
-                    id: 'county-districts-outline',
-                    type: 'line',
-                    source: 'county-districts',
-                    paint: {
-                        'line-color': '#000',
-                        'line-width': 2
-                    }
-                });
-
-                map.addLayer({
-                    id: 'county-districts-labels',
-                    type: 'symbol',
-                    source: 'county-districts',
-                    layout: {
-                        'text-field': ['get', 'district'],
-                        'text-size': 16,
-                        'text-offset': [0, 0.5],
-                        'text-anchor': 'top',
-                        visibility: 'visible'
                     },
-                    paint: {
-                        'text-color': '#000',
-                        'text-halo-color': '#FFF',
-                        'text-halo-width': 1
-                    }
-                });
+                    outline: { 'line-color': '#000', 'line-width': 2 }
+                },
+                defaultCountyVisibility
+            );
 
-                map.addLayer({
-                    id: 'county-districts-hover',
-                    type: 'fill',
-                    source: 'county-districts',
-                    paint: {
-                        'fill-color': '#FFD700', // Highlight color
-                        'fill-opacity': 0.8
-                    },
-                    filter: ['==', 'district', ''] // No district highlighted initially
-                });
+            // Initialize checkbox states
+            document.getElementById('city-districts').checked = isCityView;
+            document.getElementById('county-districts').checked = !isCityView;
 
-                map.addLayer({
-                    id: 'county-districts-hover-outline',
-                    type: 'line',
-                    source: 'county-districts',
-                    paint: {
-                        'line-color': '#FFD700',
-                        'line-width': 4
-                    },
-                    filter: ['==', 'district', ''] // No district highlighted initially
-                });
-
-                map.on('click', 'county-districts-layer', (e) => {
-                    const districtName = e.features[0].properties.district;
-                    const districtProps = propertiesMap[districtName];
-
-                    if (districtProps) {
-                        const phoneHtml = districtProps.phone
-                            ? `<p>Phone: ${districtProps.phone}</p>`
-                            : '';
-
-                        const emailHtml = districtProps.email
-                            ? `<p>Email: <a href="mailto:${districtProps.email}" style="color: blue;">${districtProps.email}</a></p>`
-                            : '';
-
-                        const popupContent = `
-                            <div style="text-align: center;">
-                                <strong>${districtName}</strong><br>
-                                <p>Population: ${districtProps.population}</p>
-                                <p>Commissioner: ${districtProps.representative}</p>
-                                ${phoneHtml}
-                                ${emailHtml}
-                            </div>
-                        `;
-                        new mapboxgl.Popup()
-                            .setLngLat(e.lngLat)
-                            .setHTML(popupContent)
-                            .addTo(map);
-                    }
-                });
-
-                // Hover and popup logic
-                map.on('mousemove', 'county-districts-layer', (e) => {
-                    if (!e.features || !e.features[0] || !e.features[0].properties) return;
-                    const districtName = e.features[0].properties.district;
-                    map.setFilter('county-districts-hover', ['==', 'district', districtName]);
-                    map.setFilter('county-districts-hover-outline', ['==', 'district', districtName]);
-                    map.getCanvas().style.cursor = 'pointer';
-                });
-
-                map.on('mouseleave', 'county-districts-layer', () => {
-                    map.setFilter('county-districts-hover', ['==', 'district', '']);
-                    map.setFilter('county-districts-hover-outline', ['==', 'district', '']);
-                    map.getCanvas().style.cursor = '';
-                });
-
-                // Add toggle visibility
-                document.getElementById('county-districts').addEventListener('change', (e) => {
+            const toggleLayerVisibility = (toggleId, layerIdsToShow, layerIdsToHide, centerZoomSettings) => {
+                document.getElementById(toggleId).addEventListener('change', (e) => {
                     const visibility = e.target.checked ? 'visible' : 'none';
-                    console.log(`Setting county districts visibility to: ${visibility}`);
-                    map.setLayoutProperty('county-districts-layer', 'visibility', visibility);
-                    map.setLayoutProperty('county-districts-outline', 'visibility', visibility);
-                    map.setLayoutProperty('county-districts-labels', 'visibility', visibility);
+
+                    layerIdsToShow.forEach(layerId => map.setLayoutProperty(layerId, 'visibility', visibility));
+                    layerIdsToHide.forEach(layerId => map.setLayoutProperty(layerId, 'visibility', 'none'));
+
+                    if (e.target.checked) {
+                        map.flyTo(centerZoomSettings);
+                    }
+
+                    // Synchronize checkboxes
+                    document.getElementById(
+                        toggleId === 'city-districts' ? 'county-districts' : 'city-districts'
+                    ).checked = !e.target.checked;
                 });
-            });
-        })();
-})
+            };
+
+            toggleLayerVisibility(
+                'city-districts',
+                ['city-districts-layer', 'city-districts-outline', 'city-districts-labels'],
+                ['county-districts-layer', 'county-districts-outline', 'county-districts-labels'],
+                cityViewSettings
+            );
+
+            toggleLayerVisibility(
+                'county-districts',
+                ['county-districts-layer', 'county-districts-outline', 'county-districts-labels'],
+                ['city-districts-layer', 'city-districts-outline', 'city-districts-labels'],
+                countyViewSettings
+            );
+        });
+    });
+
 </script>
 </body>
 </html>
