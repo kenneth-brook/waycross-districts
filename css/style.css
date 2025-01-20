@@ -10628,3 +10628,65 @@ html {
     font-size: 16px;
   }
 }
+
+#results-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  z-index: 9999;
+  max-width: 90%;
+  max-height: 80%;
+  overflow-y: auto;
+}
+
+#popup-content {
+  text-align: center;
+}
+
+#popup-results h3 {
+  font-size: 28px;
+  margin: 10px 0;
+}
+
+#popup-results img {
+  max-width: 100px;
+  border-radius: 50%;
+  margin: 10px 0;
+}
+
+.distToggle {
+  display: flex; 
+  width: 17%; 
+  justify-content: space-around;
+}
+
+#layer-controls {
+  width: 90%;
+  display: flex;
+  justify-content: space-between;
+}
+
+@media only screen and (max-width: 500px) {
+  .distToggle {
+    display: flex;
+    flex-wrap: wrap;
+    width: 33%; 
+    justify-content: space-around;
+  }
+
+  #search-container {
+    display: flex;
+    flex-direction: column;
+    align-content: center;
+    justify-content: center;
+  }
+
+  #search-button {
+    margin-top: 10px;
+  }
+}
